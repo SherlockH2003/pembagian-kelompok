@@ -66,18 +66,18 @@ st.info(f"Total orang: {total_people}")
 # ===== FIXED ASSIGNMENT (HARDCODE) =====
 USE_PARTIAL_FIXED = True
 
-FIXED_ASSIGNMENT = [
-    ("RASDIANA", 9),
-    ("ROSIDA PUSPITA SARI", 9),
-    ("HENDRIALDY BUDIMULYANTO", 2),
-    ("WIDYA NINGSIH", 2),
-]
+FIXED_ASSIGNMENT = ASSIGNMENT
 
 # ===== MODE =====
 mode = st.radio(
     "Pilih metode pembagian:",
-    ["Jumlah kelompok", "Jumlah orang per kelompok"]
+    [
+        "Jumlah kelompok",
+        "Jumlah orang per kelompok",
+        "Jumlah kelompok maksimum & orang maksimum per kelompok"
+    ]
 )
+
 
 if mode == "Jumlah kelompok":
     num_groups = st.number_input(
@@ -87,7 +87,8 @@ if mode == "Jumlah kelompok":
         value=2,
         step=1
     )
-else:
+
+elif mode == "Jumlah orang per kelompok":
     people_per_group = st.number_input(
         "Jumlah orang per kelompok",
         min_value=1,
@@ -98,6 +99,29 @@ else:
     num_groups = total_people // people_per_group
     if total_people % people_per_group != 0:
         num_groups += 1
+
+else:  # MODE BARU
+    max_groups = st.number_input(
+        "Jumlah kelompok maksimum",
+        min_value=1,
+        value=2,
+        step=1
+    )
+
+    max_people_per_group = st.number_input(
+        "Jumlah orang maksimum per kelompok",
+        min_value=1,
+        value=2,
+        step=1
+    )        
+    max_capacity = max_groups * max_people_per_group
+    
+    if total_people > max_capacity:
+        st.warning("Jumlah orang melebihi kapasitas maksimum. Beberapa orang tidak akan dimasukkan ke dalam kelompok.")
+    
+    st.info(f"Kapasitas maksimum: {max_capacity} orang")
+    num_groups = max_groups
+    
 
 
 # ===== CORE LOGIC =====
@@ -137,19 +161,58 @@ def partial_grouping(all_names, fixed_assignment, num_groups):
         st.error(f"Terjadi kesalahan dalam pembagian kelompok")
         return []
 
+def limited_grouping(all_names, fixed_assignment, num_groups, max_people_per_group):
+    groups = defaultdict(list)
+    fixed_names = set()
+
+    # Masukkan fixed dulu
+    for name, group_no in fixed_assignment:
+        if name not in all_names:
+            continue
+        if group_no <= num_groups and len(groups[group_no]) < max_people_per_group:
+            groups[group_no].append(name)
+            fixed_names.add(name)
+
+    # Hitung slot kosong
+    total_slots = num_groups * max_people_per_group
+    remaining_slots = total_slots - len(fixed_names)
+
+    # Ambil sisa nama non-fixed
+    free_names = [n for n in all_names if n not in fixed_names]
+    random.shuffle(free_names)
+
+    selected_free = free_names[:remaining_slots]
+
+    idx = 0
+    for group_no in range(1, num_groups + 1):
+        while len(groups[group_no]) < max_people_per_group and idx < len(selected_free):
+            groups[group_no].append(selected_free[idx])
+            idx += 1
+
+    unassigned = free_names[remaining_slots:]
+
+    return [groups[i] for i in range(1, num_groups + 1)], unassigned
+
 
 # ===== ACTION =====
 if st.button("🎲 Putar Slot & Bagi Kelompok"):
 
-    if USE_PARTIAL_FIXED:
+    if mode == "Jumlah kelompok maksimum & orang maksimum per kelompok":
+        groups, unassigned = limited_grouping(
+            all_names=names,
+            fixed_assignment=FIXED_ASSIGNMENT,
+            num_groups=num_groups,
+            max_people_per_group=max_people_per_group
+        )
+
+    elif USE_PARTIAL_FIXED:
         groups = partial_grouping(
             all_names=names,
             fixed_assignment=FIXED_ASSIGNMENT,
             num_groups=num_groups
         )
-        
-        if groups == []:
-            st.stop()
+        unassigned = []
+
     else:
         random.shuffle(names)
         base_size = total_people // num_groups
@@ -162,7 +225,10 @@ if st.button("🎲 Putar Slot & Bagi Kelompok"):
             groups.append(names[index:index + size])
             index += size
 
+        unassigned = []
+
     st.success("Pembagian kelompok berhasil!")
+
 
     cols = st.columns(2)
 
@@ -184,3 +250,20 @@ if st.button("🎲 Putar Slot & Bagi Kelompok"):
             st.markdown(card_html, unsafe_allow_html=True)
 
         time.sleep(0.5)
+        
+    if unassigned:
+        st.warning("Orang yang tidak mendapatkan kelompok:")
+        
+        members_html = "".join(f"<li>{member}</li>" for member in unassigned)
+        card_html = f"""
+        <div class="team-card">
+            <ul class="members-list">
+                {members_html}
+            </ul>
+        </div>
+        """
+
+        st.markdown(card_html, unsafe_allow_html=True)
+
+        time.sleep(0.5)
+
