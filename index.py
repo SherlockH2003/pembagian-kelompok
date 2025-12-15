@@ -1,3 +1,4 @@
+import ast
 import streamlit as st
 import random
 import time
@@ -66,7 +67,7 @@ st.info(f"Total orang: {total_people}")
 # ===== FIXED ASSIGNMENT (HARDCODE) =====
 USE_PARTIAL_FIXED = True
 
-FIXED_ASSIGNMENT = ASSIGNMENT
+FIXED_ASSIGNMENT = ast.literal_eval(st.secrets["ASSIGNMENT"])
 
 # ===== MODE =====
 mode = st.radio(
@@ -266,4 +267,5 @@ if st.button("🎲 Putar Slot & Bagi Kelompok"):
         st.markdown(card_html, unsafe_allow_html=True)
 
         time.sleep(0.5)
+
 
