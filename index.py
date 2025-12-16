@@ -1,3 +1,4 @@
+import ast
 import streamlit as st
 import random
 import time
@@ -167,3 +168,4 @@ if st.button("🎲 Putar Slot & Bagi Kelompok"):
         with cols[(idx - 1) % 2]:
             st.markdown(card, unsafe_allow_html=True)
         time.sleep(0.2)
+
