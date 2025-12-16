@@ -63,7 +63,6 @@ st.info(f"Total orang: {total_people}")
 # ===== FIXED CLUSTER =====
 USE_FIXED_CLUSTER = True
 FIXED_CLUSTERS = ast.literal_eval(st.secrets["ASSIGNMENT"])
-
 # ===== MODE =====
 mode = st.radio(
     "Pilih metode pembagian:",
@@ -93,6 +92,9 @@ else:
 def safe_cluster_grouping(all_names, clusters, num_groups, max_per_group):
 
     groups = [[] for _ in range(num_groups)]
+    unassigned = []
+
+    capacity = num_groups * max_per_group if max_per_group else len(all_names)
 
     # valid cluster
     clusters = [
@@ -101,53 +103,43 @@ def safe_cluster_grouping(all_names, clusters, num_groups, max_per_group):
         if len(c) > 0
     ]
 
-    random.shuffle(clusters)
     used = set()
+    random.shuffle(clusters)
 
-    # 1️⃣ cluster ke grup berbeda
-    available_indexes = list(range(num_groups))
-    random.shuffle(available_indexes)
-
+    # 1️⃣ masukkan cluster dulu
     for c in clusters:
-        idx = available_indexes.pop()
-        groups[idx].extend(c)
-        used.update(c)
-
+        placed = False
+        for g in groups:
+            if len(g) + len(c) <= max_per_group:
+                g.extend(c)
+                used.update(c)
+                placed = True
+                break
+        if not placed:
+            unassigned.extend(c)
 
     # 2️⃣ sisa orang
     free_names = [n for n in all_names if n not in used]
     random.shuffle(free_names)
 
-    total = len(all_names)
-
-    # ukuran ideal
-    base = total // num_groups
-    extra = total % num_groups
-
-    target_sizes = []
-    for i in range(num_groups):
-        size = base + (1 if i < extra else 0)
-        if max_per_group:
-            size = max(size, max_per_group)
-        target_sizes.append(size)
-
-    # 3️⃣ isi grup sampai target
-    idx = 0
     for name in free_names:
-        while len(groups[idx]) >= target_sizes[idx]:
-            idx = (idx + 1) % num_groups
-        groups[idx].append(name)
+        placed = False
+        for g in groups:
+            if len(g) < max_per_group:
+                g.append(name)
+                placed = True
+                break
+        if not placed:
+            unassigned.append(name)
 
-    # 4️⃣ shuffle internal
-    for g in groups:
-        random.shuffle(g)
+    return groups, unassigned
 
-    return groups, []
+
 
 # ===== ACTION =====
 if st.button("🎲 Putar Slot & Bagi Kelompok"):
 
-    groups, _ = safe_cluster_grouping(
+    groups, unassigned = safe_cluster_grouping(
         names,
         FIXED_CLUSTERS if USE_FIXED_CLUSTER else [],
         num_groups,
@@ -168,4 +160,20 @@ if st.button("🎲 Putar Slot & Bagi Kelompok"):
         with cols[(idx - 1) % 2]:
             st.markdown(card, unsafe_allow_html=True)
         time.sleep(0.2)
+        
+    if unassigned:
+        st.warning("Orang yang tidak mendapatkan kelompok:")
+
+        members_html = "".join(f"<li>{member}</li>" for member in unassigned)
+        card_html = f"""
+        <div class="team-card">
+            <ul class="members-list">
+                {members_html}
+            </ul>
+        </div>
+        """
+
+        st.markdown(card_html, unsafe_allow_html=True)
+        time.sleep(0.5)
+
 
